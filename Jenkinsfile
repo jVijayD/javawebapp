@@ -1,23 +1,36 @@
 pipeline {
     agent any
-    tools {
+   tools {
     maven 'Maven3.8.4'	
 	}
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/keyspaceits/javawebapp.git']]])
+         stages {
+             stage('checkout') {
+                 steps {
+                 checkout([$class: 'GitSCM', branches: [[name: '*/master' , name: '*/test']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/jVijayD/javawebapp.git']]])
             }
+             }
+             stage('Build') {
+                 steps {
+                     sh 'mvn clean install -f pom.xml'
+                 }
+             }
+             stage('Deploy to s3 keyjen') {
+                 when {
+                     branch 'master'
+                 }
+                 steps {
+                     s3Upload consoleLogLevel: 'INFO', dontSetBuildResultOnFailure: false, dontWaitForConcurrentBuildCompletion: false, entries: [[bucket: 'keyjen', excludedFile: '', flatten: false, gzipFiles: false, keepForever: false, managedArtifacts: false, noUploadOnFailure: false, selectedRegion: 'us-east-1', showDirectlyInBrowser: false, sourceFile: '**/*.war', storageClass: 'STANDARD', uploadFromSlave: false, useServerSideEncryption: false]], pluginFailureResultConstraint: 'FAILURE', profileName: 'awsbucket', userMetadata: []
+             }
         }
-        stage('Build') {
-            steps {
-                sh 'mvn clean install -f pom.xml'
-            }
+             stage('Deploy to S3 expojen ') {
+             when {
+                     branch 'test'
+                 }
+                 steps {
+                     s3Upload consoleLogLevel: 'INFO', dontSetBuildResultOnFailure: false, dontWaitForConcurrentBuildCompletion: false, entries: [[bucket: 'expojen', excludedFile: '', flatten: false, gzipFiles: false, keepForever: false, managedArtifacts: false, noUploadOnFailure: false, selectedRegion: 'us-east-1', showDirectlyInBrowser: false, sourceFile: '**/*.war', storageClass: 'STANDARD', uploadFromSlave: false, useServerSideEncryption: false]], pluginFailureResultConstraint: 'FAILURE', profileName: 'awsbucket', userMetadata: []
+             }
         }
-        stage('Deploy to Tomcat') {
-            steps {
-                deploy adapters: [tomcat9(credentialsId: 'tomcat-deployer', path: '', url: 'http://192.168.1.36/')], contextPath: null, war: '**/*.war'
-            }
-        }
-    }
+         }
 }
+    
+   
