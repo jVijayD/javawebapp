@@ -1,44 +1,34 @@
 pipeline {
     agent any
-    tools{
-        maven 'Maven3.8.2'
-    }
-    stages {
-        stage("checkout") {
-            steps {
-               checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/keyspaceits/javawebapp.git']]]) 
+   tools {
+    maven 'Maven3.8.4'	
+	}
+         stages {
+             stage('checkout') {
+                 steps {
+                 checkout([$class: 'GitSCM', branches: [[name: '*/master' , name: '*/test']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/jVijayD/javawebapp.git']]])
             }
+             }
+             stage('Build') {
+                 steps {
+                     sh 'mvn clean install -f pom.xml'
+                 }
+             }
+             stage('Deploy to s3 keyjen') {
+                 when {
+                     branch 'master'
+                 }
+                 steps {
+                     s3Upload consoleLogLevel: 'INFO', dontSetBuildResultOnFailure: false, dontWaitForConcurrentBuildCompletion: false, entries: [[bucket: 'keyjen', excludedFile: '', flatten: false, gzipFiles: false, keepForever: false, managedArtifacts: false, noUploadOnFailure: false, selectedRegion: 'us-east-1', showDirectlyInBrowser: false, sourceFile: '**/*.war', storageClass: 'STANDARD', uploadFromSlave: false, useServerSideEncryption: false]], pluginFailureResultConstraint: 'FAILURE', profileName: 'awsbucket', userMetadata: []
+             }
         }
-        stage("build") {
-            steps {
-                sh 'mvn clean install -f pom.xml'
-            }
+             stage('Deploy to S3 expojen ') {
+             when {
+                     branch 'test'
+                 }
+                 steps {
+                     s3Upload consoleLogLevel: 'INFO', dontSetBuildResultOnFailure: false, dontWaitForConcurrentBuildCompletion: false, entries: [[bucket: 'expojen', excludedFile: '', flatten: false, gzipFiles: false, keepForever: false, managedArtifacts: false, noUploadOnFailure: false, selectedRegion: 'us-east-1', showDirectlyInBrowser: false, sourceFile: '**/*.war', storageClass: 'STANDARD', uploadFromSlave: false, useServerSideEncryption: false]], pluginFailureResultConstraint: 'FAILURE', profileName: 'awsbucket', userMetadata: []
+             }
         }
-        stage("CodeQuality") {
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                sh 'mvn sonar:sonar -f pom.xml'
-                }
-            }
-        }
-        stage("dev deploy") {
-            steps {
-                deploy adapters: [tomcat9(credentialsId: 'deployer', path: '', url: 'http://54.164.159.39:8080')], contextPath: null, war: '**/*.war'
-            }
-        }
-		stage('Dev apprl for QA') {
-            steps {
-                echo "taking approval from Dev Manager"
-                timeout(time: 7, unit: 'DAYS') {
-                    input message: 'Do you want to proceed to QA?', submitter:'admin'
-                }
-            }
-        }
-        stage('QA Deploy'){
-            steps{
-                deploy adapters: [tomcat9(credentialsId: 'deployer', path: '', url: 'http://54.164.159.39:8080')], contextPath: null, war: '**/*.war'
-            }
-        }
-        
-    }
+         }
 }
